@@ -1,10 +1,16 @@
 package gr.chris.transportation;
 
+import android.content.Context;
 import android.content.pm.PackageManager;
+import android.content.res.AssetManager;
 import android.graphics.Color;
 import android.location.Location;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -17,11 +23,19 @@ import com.google.android.gms.maps.CameraUpdateFactory;
 import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.BitmapDescriptorFactory;
 import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
+import com.google.android.gms.maps.model.Polygon;
 import com.google.android.gms.maps.model.PolygonOptions;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.util.ArrayList;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -32,6 +46,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     boolean locationPermissionGranted=true;
 
     GoogleMap map;
+    DBHelper mydb;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -41,7 +56,68 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
+
+
+        if(!databaseFile(this).exists()||databaseFile(this).length()==0){
+            AssetManager am=getAssets();
+            try {
+                InputStream in=am.open("ROUTES.db");
+                int size=in.available();
+                Toast.makeText(this,String.valueOf(size),Toast.LENGTH_SHORT).show();
+                byte[] buffer=new byte[size];
+                in.read(buffer);
+                in.close();
+
+                File file=databaseFile(this);
+                if (!file.exists()) {
+                    file.createNewFile();
+                }
+                FileOutputStream fos = new FileOutputStream(file);
+                fos.write(buffer);
+                fos.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+
+        ArrayList<String> items=new ArrayList<String>();
+        items.add("None");
+        items.add("Normal");
+        items.add("Satellite");
+        items.add("Terrain");
+        items.add("Hybrid");
+
+        Spinner opts=(Spinner)findViewById(R.id.spinner);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
+                android.R.layout.simple_spinner_item, items);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        opts.setAdapter(adapter);
+        opts.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
+                if(mMap!=null){
+                    mMap.setMapType(position);
+                }
+            }
+
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+
+            }
+        });
+
     }
+
+    public static File databaseFile(Context paramContext)
+    {
+        File localFile2 = paramContext.getExternalFilesDir(null);
+        File localFile1 = localFile2;
+        if (localFile2 == null) {
+            localFile1 = paramContext.getFilesDir();
+        }
+        return new File(localFile1, "ROUTES.db");
+    }
+
 
     /**
      * Manipulates the map once available.
@@ -59,19 +135,38 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         map=googleMap;
         mMap.setMapType(mMap.MAP_TYPE_SATELLITE);
 
+
+        File routes=databaseFile(this);
+        mydb = new DBHelper(this,routes.toString());
+        ArrayList<DBHelper.Station> route=mydb.getRoute("222");
+
+
+
+
         // Add a marker in Sydney and move the camera
         LatLng sydney = new LatLng(-34, 151);
         //mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
         LatLng home=new LatLng(38.0144327,23.7559625);
         mMap.addMarker(new MarkerOptions().position(home).title("Αθανασίου Διάκου 22"));
         mMap.addCircle(new CircleOptions().center(home).radius(10000));
-        PolygonOptions route=new PolygonOptions();
-        route.clickable(true);
-        route.strokeColor(Color.GREEN);
-        route.strokeWidth(2);
-        route.add(home);
-        route.add(new LatLng(38.014734,23.753534));
-        mMap.addPolygon(route);
+        PolygonOptions routeLine=new PolygonOptions();
+        routeLine.clickable(true);
+        routeLine.geodesic(true);
+
+        routeLine.strokeColor(Color.GREEN);
+        routeLine.strokeWidth(2);
+        for(DBHelper.Station s:route){
+            routeLine.add(new LatLng(s.lat,s.lon));
+            MarkerOptions mop=new MarkerOptions();
+            mop.position(new LatLng(s.lat,s.lon));
+            mop.title(s.name);
+            mop.snippet(s.sym);
+            mop.icon(BitmapDescriptorFactory.fromResource(R.drawable.stop));
+            mMap.addMarker(mop);
+        }
+
+        mMap.addPolygon(routeLine);
+
         mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(home,18.0f));
         mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
@@ -95,6 +190,14 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 sb.append("Longitude:");
                 sb.append(loc.longitude);
                 tv.setText(sb.toString());
+            }
+        });
+
+        mMap.setOnPolygonClickListener(new GoogleMap.OnPolygonClickListener() {
+            @Override
+            public void onPolygonClick(Polygon polygon) {
+                TextView tv=(TextView)findViewById(R.id.textView);
+                tv.setText("Route:504");
             }
         });
 

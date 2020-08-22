@@ -16,17 +16,25 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="100dp"
-        android:background="#972196F3"
-        android:layout_alignBottom="@id/map">
+        android:layout_alignBottom="@id/map"
+        android:background="#B963E75E"
+        android:gravity="right"
+        android:orientation="vertical">
 
 
         <TextView
             android:id="@+id/textView"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:paddingLeft="10dp"
             android:text="@string/app_name" />
+
+        <Spinner
+            android:id="@+id/spinner"
+            android:background="#eeeeee"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1" />
     </LinearLayout>
 
 </RelativeLayout>
