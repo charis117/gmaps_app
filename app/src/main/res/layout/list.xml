@@ -1,0 +1,96 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+	android:gravity="center_horizontal"
+	
+    android:orientation="vertical">
+	<LinearLayout 
+		android:layout_width="fill_parent"
+		android:layout_height="wrap_content"
+		android:gravity="center"
+	
+		>
+	<TextView
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="Μέρα"
+		android:id="@+id/listTextView"
+		android:textColor="#00aa00"
+		android:textSize="20dp"
+		/>
+		<Spinner
+			android:layout_width="wrap_content"
+			android:layout_height="40dp"
+			
+			android:id="@+id/listtIdClass"
+			android:spinnerMode="dropdown"
+		/> 
+		<ImageButton
+			
+			android:background="@android:drawable/ic_menu_rotate"
+			android:layout_width="wrap_content"
+			android:onClick="refresh"
+			android:layout_height="wrap_content"
+		/>
+	<LinearLayout
+		android:layout_width="10dp"
+		android:layout_height="wrap_content"
+		/>
+	<ImageButton
+		android:background="@android:drawable/ic_menu_share"
+		android:layout_width="wrap_content"
+		android:layout_height="wrap_content"
+		android:text="Κοινή χρήση"
+		android:onClick="share"
+		/>
+	</LinearLayout>
+    <ScrollView
+		android:layout_width="match_parent"
+		android:layout_height="350dp"
+		android:fillViewport="true"
+		>
+		<ListView
+			android:layout_width="match_parent"
+			android:layout_height="wrap_content"
+			android:id="@+id/listListView"
+			android:textSize="15dp"
+			
+			android:divider="#0000FF"
+			android:dividerHeight="1dp"
+			/>
+	</ScrollView>
+	<RelativeLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		>
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="60dp"
+		android:orientation="horizontal"
+		android:gravity="right"
+		>
+		<Button
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:onClick="nextday"
+			android:id="@+id/listButton"
+			android:text="Αύριο>"
+			/>
+	</LinearLayout>
+		<LinearLayout
+			android:layout_width="match_parent"
+			android:layout_height="60dp"
+			android:orientation="horizontal"
+			android:gravity="left"
+		>
+			<Button
+				android:layout_width="wrap_content"
+				android:layout_height="wrap_content"
+				android:onClick="prevday"
+				android:id="@+id/listPrevButton"
+				android:text="Χθες"
+			/>
+		</LinearLayout>
+	</RelativeLayout>
+		
+</LinearLayout>

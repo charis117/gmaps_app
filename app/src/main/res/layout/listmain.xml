@@ -1,0 +1,33 @@
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+	android:orientation="vertical"
+    android:gravity="center|top">
+
+	<LinearLayout
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:orientation="horizontal"
+	>
+		<EditText
+
+			android:layout_width="wrap_content"
+			android:ems="14"
+			android:hint="Αναζήτηση"
+			android:layout_height="50dp"
+			android:id="@+id/mainEditText"/>
+		<ImageButton
+			android:layout_width="wrap_content"
+			android:layout_height="wrap_content"
+			android:onClick="search"
+			android:src="@android:drawable/ic_menu_search"
+		/>
+	</LinearLayout>
+	<ListView
+		android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+		android:textStyle="bold"
+		android:id="@+id/listsv"
+	/>
+
+</LinearLayout>
