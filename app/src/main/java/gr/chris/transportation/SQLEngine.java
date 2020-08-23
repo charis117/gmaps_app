@@ -6,11 +6,16 @@ import android.database.Cursor;
 import android.database.DatabaseUtils;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
+
+import com.google.android.gms.maps.model.LatLng;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 
-public class DBHelper extends SQLiteOpenHelper {
+import gr.chris.transportation.legacy.Engine;
+
+public class SQLEngine extends SQLiteOpenHelper {
 
     public static final String DATABASE_NAME = "MyDBName.db";
     public static final String CONTACTS_TABLE_NAME = "routes";
@@ -22,7 +27,7 @@ public class DBHelper extends SQLiteOpenHelper {
     public static final String CONTACTS_COLUMN_PHONE = "color";
     private HashMap hp;
 
-    public DBHelper(Context context,String fileName) {
+    public SQLEngine(Context context, String fileName) {
         super(context, fileName , null, 1);
     }
 
@@ -128,12 +133,56 @@ public class DBHelper extends SQLiteOpenHelper {
 
         return dromologio;
     }
+
+
+
+    public ArrayList<Engine.Route> getRoutes(String stationSym){
+        ArrayList<Station> dromologio = new ArrayList<Station>();
+
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor res =  db.rawQuery( "select _id from markers where symbol="+stationSym, null );
+        res.moveToFirst();
+        Log.v("INFO","REQUESTED STATION WITH SYMBOL:"+stationSym);
+
+        if(res.getCount()==0){
+            return null;
+        }
+
+        int stationID=res.getInt(res.getColumnIndex("_id"));
+        Log.v("INFO","FOUND STATION ID:"+stationID);
+        res=db.rawQuery("select route from stops where marker="+stationID,null);
+        res.moveToFirst();
+        Log.v("INFO","FOUND ROUTES COUNT:"+res.getCount());
+
+
+        ArrayList<Engine.Route> avaRoutes=new ArrayList<Engine.Route>();
+        int cnt=1;
+        while(res.isAfterLast() == false){
+            int routeID=res.getInt(res.getColumnIndex("route"));
+
+            Cursor c2=db.rawQuery("select * from routes where _id="+routeID,null);
+            c2.moveToFirst();
+            avaRoutes.add(new Engine.Route(
+                    c2.getString(c2.getColumnIndex("title")),
+                    c2.getString(c2.getColumnIndex("label")),
+                    String.valueOf(routeID),
+                    String.valueOf(c2.getInt(c2.getColumnIndex("agency"))),
+                    cnt
+            ));
+            cnt++;
+
+            res.moveToNext();
+        }
+
+        return avaRoutes;
+    }
         static class Station{
         float lat;
         float lon;
         String name;
         int id;
         String sym;
+        LatLng gmloc;
 
         public Station(float lat, float lon, String name, int id, String sym) {
             this.lat = lat;
@@ -141,6 +190,9 @@ public class DBHelper extends SQLiteOpenHelper {
             this.name = name;
             this.id = id;
             this.sym = sym;
+            this.gmloc=new LatLng(lat,lon);
         }
     }
+
+    //public Engine.Station getStation(String stati)
 }
