@@ -24,18 +24,24 @@ import com.google.android.gms.maps.GoogleMap;
 import com.google.android.gms.maps.OnMapReadyCallback;
 import com.google.android.gms.maps.SupportMapFragment;
 import com.google.android.gms.maps.model.BitmapDescriptorFactory;
-import com.google.android.gms.maps.model.CircleOptions;
 import com.google.android.gms.maps.model.LatLng;
 import com.google.android.gms.maps.model.Marker;
 import com.google.android.gms.maps.model.MarkerOptions;
 import com.google.android.gms.maps.model.Polygon;
-import com.google.android.gms.maps.model.PolygonOptions;
+import com.google.android.gms.maps.model.Polyline;
+import com.google.android.gms.maps.model.PolylineOptions;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Random;
+
+import gr.chris.transportation.legacy.CAlertDialog;
+import gr.chris.transportation.legacy.Engine;
 
 public class MapsActivity extends FragmentActivity implements OnMapReadyCallback {
 
@@ -46,17 +52,17 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     boolean locationPermissionGranted=true;
 
     GoogleMap map;
-    DBHelper mydb;
+    SQLEngine mydb;
+    HashMap<String,RouteDrawing> visibleRoutes=new HashMap<String,RouteDrawing>();
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_maps);
+        setContentView(R.layout.maps);
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
         SupportMapFragment mapFragment = (SupportMapFragment) getSupportFragmentManager()
                 .findFragmentById(R.id.map);
         mapFragment.getMapAsync(this);
-
 
         if(!databaseFile(this).exists()||databaseFile(this).length()==0){
             AssetManager am=getAssets();
@@ -79,24 +85,19 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                 e.printStackTrace();
             }
         }
-
-        ArrayList<String> items=new ArrayList<String>();
-        items.add("None");
-        items.add("Normal");
-        items.add("Satellite");
-        items.add("Terrain");
-        items.add("Hybrid");
+        final int[] mapTypeIDs={GoogleMap.MAP_TYPE_HYBRID,GoogleMap.MAP_TYPE_SATELLITE,GoogleMap.MAP_TYPE_NORMAL,GoogleMap.MAP_TYPE_TERRAIN,GoogleMap.MAP_TYPE_NONE};
+        String[] mapTypes={"Both","Satellite Image","Normal","Terrain","Nothing"};
 
         Spinner opts=(Spinner)findViewById(R.id.spinner);
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this,
-                android.R.layout.simple_spinner_item, items);
+                android.R.layout.simple_spinner_item, mapTypes);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         opts.setAdapter(adapter);
         opts.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int position, long id) {
                 if(mMap!=null){
-                    mMap.setMapType(position);
+                    mMap.setMapType(mapTypeIDs[position]);
                 }
             }
 
@@ -108,6 +109,117 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     }
 
+
+    public void select(View v){
+
+        ArrayList<Engine.Route> avaRoutes=mydb.getAllRoutes();
+         new CAlertDialog(MapsActivity.this, null, avaRoutes, "OK", true,visibleRoutes, new CAlertDialog.Result() {
+            @Override
+            public void selected(String routeID,boolean addOrRemove) {
+                ////////Toast.makeText(getApplicationContext(),routeID,Toast.LENGTH_SHORT).show();
+                //showRoute(routeID);
+                if(addOrRemove){
+                    visibleRoutes.put(routeID,showRoute(routeID,true));
+                }else{
+                    RouteDrawing toRemove =visibleRoutes.get(routeID);
+                    toRemove.polyline.remove();
+                    for(Marker m:toRemove.marksArrayList){
+                        m.remove();
+                    }
+                    visibleRoutes.remove(routeID);
+                }
+            }
+        });
+
+    }
+
+    Polyline last=null;
+
+    public int randomColor(){
+        Random r=new Random();
+        int[] sels={Color.WHITE,Color.YELLOW,Color.GREEN,Color.MAGENTA};
+        //int color=Color.rgb(r.nextInt(255),r.nextInt(255),r.nextInt(255));
+        return sels[r.nextInt(sels.length)];
+    }
+
+    public float pythDistance(double x1,double y1,double x2,double y2){
+        Location one=new Location("One");
+        one.setLatitude(x1);
+        one.setLongitude(y1);
+        Location two=new Location("two");
+        two.setLatitude(x2);
+        two.setLongitude(y2);
+        return one.distanceTo(two);
+    }
+
+    ArrayList<Marker> nearbyMS=new ArrayList<Marker>();
+
+    public void viewS(View v){
+        float camZoom=map.getCameraPosition().zoom;
+        float calc=(21/camZoom)*280;
+        Log.v("ZOOM:",String.valueOf(map.getCameraPosition().zoom));
+        float radius=calc;
+
+        LatLng viewCoords=map.getCameraPosition().target;
+        ArrayList<SQLEngine.Station> nearby=new ArrayList<SQLEngine.Station>();
+        for(SQLEngine.Station s:mydb.getAllStations()){
+            if(pythDistance(viewCoords.latitude,viewCoords.longitude,s.lat,s.lon)<radius){
+                nearby.add(s);
+                Log.v("Z2OM:",String.valueOf(pythDistance(viewCoords.latitude,viewCoords.longitude,s.lat,s.lon)));
+            }
+        }
+        for(SQLEngine.Station s:nearby) {
+            MarkerOptions mop = new MarkerOptions();
+            mop.position(new LatLng(s.lat, s.lon));
+            mop.title(s.name);
+            mop.snippet(s.sym);
+            mop.zIndex(0.5f);
+            nearbyMS.add(map.addMarker(mop));
+        }
+
+    }
+
+
+    public RouteDrawing showRoute(String routeId,boolean goToRoute){
+        ArrayList<SQLEngine.Station> route=mydb.getRoute(routeId);
+        RouteDrawing rd=new RouteDrawing();
+        PolylineOptions routeLine=new PolylineOptions();
+        routeLine.clickable(true);
+        routeLine.geodesic(true);
+
+        routeLine.color(randomColor());
+        routeLine.width(5);
+        for(SQLEngine.Station s:route) {
+            routeLine.add(new LatLng(s.lat, s.lon));
+            MarkerOptions mop = new MarkerOptions();
+            mop.position(new LatLng(s.lat, s.lon));
+            mop.title(s.name);
+            mop.snippet(s.sym);
+            mop.icon(BitmapDescriptorFactory.fromResource(R.drawable.stop));
+            mop.zIndex(0.5f);
+            rd.marksArrayList.add(mMap.addMarker(mop));
+
+        }
+
+
+
+
+
+
+        if(last!=null) {
+            last.remove();
+        }
+
+        if(goToRoute) {
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(route.get(0).gmloc, 18.0f));
+        }
+        rd.polyline=mMap.addPolyline(routeLine);
+        rd.polylineID=rd.polyline.getId();
+        Toast.makeText(this,rd.polyline.getId(),Toast.LENGTH_SHORT);
+        Log.v("MESSAGE","ADDED POLYLINE ID:"+rd.polyline.getId());
+        return rd;
+    }
+
     public static File databaseFile(Context paramContext)
     {
         File localFile2 = paramContext.getExternalFilesDir(null);
@@ -117,6 +229,16 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         }
         return new File(localFile1, "ROUTES.db");
     }
+
+
+
+
+    public void showTrains(){
+
+    }
+
+
+
 
 
     /**
@@ -131,54 +253,105 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     @Override
     public void onMapReady(GoogleMap googleMap) {
         mMap = googleMap;
-
         map=googleMap;
-        mMap.setMapType(mMap.MAP_TYPE_SATELLITE);
+        mMap.setMapType(mMap.MAP_TYPE_HYBRID);
+        //mMap.setMapStyle(MapStyleOptions.loadRawResourceStyle(this,R.raw.dark_theme));
 
 
         File routes=databaseFile(this);
-        mydb = new DBHelper(this,routes.toString());
-        ArrayList<DBHelper.Station> route=mydb.getRoute("222");
+        mydb = new SQLEngine(this,routes.toString());
 
 
+        int init=mydb.getM1id();
+        int[] colors={Color.GREEN,Color.RED,Color.BLUE};
+        for(int g=init;g<init+5;g+=2) {
+            RouteDrawing pre=new RouteDrawing();
+            ArrayList<SQLEngine.Station> route = mydb.getRoute(String.valueOf(g));
 
 
-        // Add a marker in Sydney and move the camera
-        LatLng sydney = new LatLng(-34, 151);
-        //mMap.moveCamera(CameraUpdateFactory.newLatLng(sydney));
-        LatLng home=new LatLng(38.0144327,23.7559625);
-        mMap.addMarker(new MarkerOptions().position(home).title("Αθανασίου Διάκου 22"));
-        mMap.addCircle(new CircleOptions().center(home).radius(10000));
-        PolygonOptions routeLine=new PolygonOptions();
-        routeLine.clickable(true);
-        routeLine.geodesic(true);
+            PolylineOptions routeLine = new PolylineOptions();
+            routeLine.clickable(true);
+            routeLine.geodesic(true);
+            routeLine.color(colors[(g-init)/2]);
+            routeLine.width(20);
 
-        routeLine.strokeColor(Color.GREEN);
-        routeLine.strokeWidth(2);
-        for(DBHelper.Station s:route){
-            routeLine.add(new LatLng(s.lat,s.lon));
-            MarkerOptions mop=new MarkerOptions();
-            mop.position(new LatLng(s.lat,s.lon));
-            mop.title(s.name);
-            mop.snippet(s.sym);
-            mop.icon(BitmapDescriptorFactory.fromResource(R.drawable.stop));
-            mMap.addMarker(mop);
+            for (SQLEngine.Station s : route) {
+                routeLine.add(new LatLng(s.lat, s.lon));
+                MarkerOptions mop = new MarkerOptions();
+                mop.position(new LatLng(s.lat, s.lon));
+                mop.title(s.name);
+                mop.snippet(s.sym);
+                mop.zIndex(0.2f);
+                mop.icon(BitmapDescriptorFactory.fromResource(R.drawable.trainsm));
+                pre.marksArrayList.add(mMap.addMarker(mop));
+            }
+            pre.polyline=mMap.addPolyline(routeLine);
+            pre.polylineID=pre.polyline.getId();
+            visibleRoutes.put(String.valueOf(g),pre);
+
         }
 
-        mMap.addPolygon(routeLine);
-
-        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(home,18.0f));
+        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(38.1255073,23.7637454),18.0f));
         mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
-                Toast.makeText(MapsActivity.this,marker.getTitle(), Toast.LENGTH_SHORT).show();
-                return false;
+                //Toast.makeText(MapsActivity.this,marker.getTitle(), Toast.LENGTH_SHORT).show();
+              return false;
             }
         });
 
+        mMap.setOnInfoWindowClickListener(new GoogleMap.OnInfoWindowClickListener() {
+            @Override
+            public void onInfoWindowClick(Marker marker) {
+                ArrayList<Engine.Route> avaRoutes=mydb.getRoutes(marker.getSnippet());
+                new CAlertDialog(MapsActivity.this,marker.getTitle(),"",null,avaRoutes,"OK",false,mydb,new CAlertDialog.Result(){
+
+                    @Override
+                    public void selected(String routeID, boolean addOrRemove) {
+                        visibleRoutes.put(routeID,showRoute(routeID,false));
+                    }
+                });
+                if(!nearbyMS.isEmpty()){
+                    for(Marker m:nearbyMS){
+                        m.remove();
+                    }
+                    nearbyMS.clear();
+                }
+
+            }
+        });
+
+        mMap.setOnPolylineClickListener(new GoogleMap.OnPolylineClickListener() {
+            @Override
+            public void onPolylineClick(Polyline polyline) {
+                Toast.makeText(getApplicationContext(),polyline.getId(),Toast.LENGTH_SHORT);
+                Log.v("MESSAGE","CLICKED POLYLINE ID:"+polyline.getId());
+                ArrayList<Marker> fin=null;
+                String routeID=null;
+                for(Map.Entry<String,RouteDrawing> g: visibleRoutes.entrySet()) {
+                    if (g.getValue().polylineID.equals(polyline.getId())) {
+                        routeID = g.getKey();
+                        fin = g.getValue().marksArrayList;
+                        Log.v("MESSAGE", "Found Polyline ID" + polyline.getId());
+                        break;
+                    }
+                }
+
+                ArrayList<String> markNames=new ArrayList<String>();
+                for(Marker m:fin){
+                    markNames.add(m.getTitle());
+                }
+                Engine.Route res=mydb.getRouteFromID(routeID);
+                new CAlertDialog(MapsActivity.this,getString(R.string.route)+" "+res.busId+"-"+res.routeName,fin,mMap);
+            }
+        });
+
+
+
         updateLocationUI(mMap);
 
-        mMap.setTrafficEnabled(true);
+        mMap.setTrafficEnabled(false);
+
         mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener(){
             @Override
             public void onMapClick(LatLng loc) {
@@ -201,7 +374,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
             }
         });
 
+
     }
+
+
+
+
 
 
     @Override

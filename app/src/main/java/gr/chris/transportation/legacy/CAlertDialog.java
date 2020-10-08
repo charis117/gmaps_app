@@ -6,17 +6,32 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.DialogInterface;
+import android.database.DataSetObserver;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.View.OnLongClickListener;
+import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.CheckBox;
+import android.widget.CompoundButton;
+import android.widget.EditText;
+import android.widget.ListAdapter;
 import android.widget.ListView;
+import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.model.Marker;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 
 import gr.chris.transportation.R;
+import gr.chris.transportation.RouteDrawing;
 import gr.chris.transportation.SQLEngine;
 
 public class CAlertDialog extends Activity
@@ -91,36 +106,33 @@ public class CAlertDialog extends Activity
 
 
 	}
-	CAlertDialog(final Activity context,String title,String message,final String button,boolean cancel,final int action){
+	CAlertDialog(final Activity context,String title,String message,final String button,boolean cancel,final int action) {
 		AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(context);
 		//final MainActivity Ma=(MainActivity)context;
 		alertDialogBuilder.setTitle(title);
 
-		alertDialogBuilder .setMessage(message) .setCancelable(cancel) .setPositiveButton(button,new DialogInterface.OnClickListener() {
-				public void onClick(DialogInterface dialog,int id) {
-					switch(action){
-						case 100:
-							context.finish();
+		alertDialogBuilder.setMessage(message).setCancelable(cancel).setPositiveButton(button, new DialogInterface.OnClickListener() {
+			public void onClick(DialogInterface dialog, int id) {
+				switch (action) {
+					case 100:
+						context.finish();
 
-							break;
-						case 200:
-							dialog.cancel();
+						break;
+					case 200:
+						dialog.cancel();
 
-							break;
+						break;
 
-					}
+				}
+			}
+		});
+		if (cancel) {
+			alertDialogBuilder.setNegativeButton(cancel_button, new DialogInterface.OnClickListener() {
+				public void onClick(DialogInterface dialog, int id) {
+					dialog.cancel();
 				}
 			});
-		if(cancel){
-			alertDialogBuilder.setNegativeButton(cancel_button,new DialogInterface.OnClickListener(){
-					public void onClick(DialogInterface dialog,int id){
-						dialog.cancel();
-					}
-				});
 		}
-
-
-
 
 
 		final AlertDialog alertDialog = alertDialogBuilder.create();
@@ -159,13 +171,42 @@ public class CAlertDialog extends Activity
 		alertDialog.show();
 
 
+	}
+
+
+
+	public CAlertDialog(Activity a, String title, final ArrayList<Marker> list, final GoogleMap map){
+		AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(a);
+		//final MainActivity Ma=(MainActivity)context;
+		alertDialogBuilder.setTitle(title);
+		ArrayList<String> markNames=new ArrayList<String>();
+		for(Marker m:list){
+			markNames.add(m.getTitle());
+		}
+		ArrayAdapter<String> ada=new ArrayAdapter<String>(a, android.R.layout.simple_list_item_1,markNames);
+		alertDialogBuilder.setAdapter(ada, new DialogInterface.OnClickListener() {
+			@Override
+			public void onClick(DialogInterface dialog, int i) {
+
+				map.animateCamera(CameraUpdateFactory.newLatLngZoom(list.get(i).getPosition(),18.0f));
+				dialog.dismiss();
+			}
+		});
+		AlertDialog ad=alertDialogBuilder.create();
+		ad.show();
 
 	}
 
 
 
-
 	public CAlertDialog(final Activity context, String title, String message, final Engine.Station s, final ArrayList<Engine.Route> ar, final String button, boolean cancel, final SQLEngine ss){
+
+
+	}
+
+
+
+	public CAlertDialog(final Activity context, String title, String message, final Engine.Station s, final ArrayList<Engine.Route> ar, final String button, boolean cancel, final SQLEngine ss,final Result handlerr){
 		AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(context);
 		//final MainActivity Ma=(MainActivity)context;
 		alertDialogBuilder.setTitle(title);
@@ -189,14 +230,22 @@ public class CAlertDialog extends Activity
 				@Override
 				public void onItemClick(AdapterView<?> p1, View p2, int p3, long p4){
 					Engine.Route r=ar.get(p3);
-					String info="Πάροχος:"+r.AgencyName;
-					info+="\nΔρομολόγιο:\n"+r.routeName;
-					info+="\nID:"+r.routeId;
-					new CAlertDialog(context,r.busId,info,"OK",false,ACTION_HIDE_DIALOG);
+					handlerr.selected(r.routeId,true);
 
 				}
 
 			
+		});
+		sv.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+			@Override
+			public boolean onItemLongClick(AdapterView<?> parent, View view, int position, long id) {
+				Engine.Route r=ar.get(position);
+				String info="Πάροχος:"+r.AgencyName;
+				info+="\nΔρομολόγιο:\n"+r.routeName;
+				info+="\nID:"+r.routeId;
+				new CAlertDialog(context,r.busId,info,"OK",false,ACTION_HIDE_DIALOG);
+				return true;
+			}
 		});
 		//TODO:Temporarly disabled. Change to use MYSQL instead of CSV files
 		/*sv.setOnItemClickListener(new OnItemClickListener(){
@@ -294,6 +343,90 @@ public class CAlertDialog extends Activity
 	}
 
 
+	public ArrayList<Engine.Route> show;
+	public HashMap<String,RouteDrawing> hashMp;
+	public AlertDialog current=null;
+
+	public CAlertDialog(final Activity context, final Engine.Station s, final ArrayList<Engine.Route> ar, final String button, boolean cancel, HashMap<String,RouteDrawing> hs, final Result res){
+		final AlertDialog.Builder alertDialogBuilder = new AlertDialog.Builder(context);
+		//final MainActivity Ma=(MainActivity)context;
+		hashMp=hs;
+		alertDialogBuilder.setTitle(context.getString(R.string.routes));
+		show=new ArrayList<Engine.Route>(ar);
+		final View mai=View.inflate(context, R.layout.route_selector,null);
+		final ListView sv=(ListView)mai.findViewById(R.id.allRoutes);
+		EditText ed=mai.findViewById(R.id.search_bar);
+		ed.addTextChangedListener(new TextWatcher() {
+			@Override
+			public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+
+			}
+
+			@Override
+			public void onTextChanged(CharSequence s, int start, int before, int count) {
+
+			}
+
+			@Override
+			public void afterTextChanged(Editable s) {
+				show=new ArrayList<Engine.Route>();
+				String key=s.toString();
+				for(Engine.Route r:ar){
+					if(r.routeName.contains(key)||r.busId.contains(key)){
+						show.add(r);
+					}
+				}
+				ArrayList<String> arr=new ArrayList<String>();
+				for(Engine.Route r:show){
+					arr.add(r.busId+":"+r.routeName);
+				}
+				RouteCheck rc=new RouteCheck(context,show,res);
+				if(show.size()==0){
+					sv.setAdapter(new ArrayAdapter<String>(context,android.R.layout.simple_list_item_1,new String[]{context.getString(R.string.notfound)}));
+				}else {
+					sv.setAdapter(rc);
+				}
+			}
+		});
+		//WebView wb=(WebView)mai.findViewById(R.id.alertlistWebView);
+		//wb.getSettings().setJavaScriptEnabled(true);
+		//wb.loadUrl("https://www.google.gr/maps/place/"+s.latitude+",+"+s.longtitude+"/data=!3m1!1e3");
+		ArrayList<String> arr=new ArrayList<String>();
+		for(Engine.Route r:ar){
+			arr.add(r.busId+":"+r.routeName);
+		}
+		//sv.setAdapter(new ArrayAdapter<String>(context,android.R.layout.simple_list_item_1,arr));
+		RouteCheck rc=new RouteCheck(context,show,res);
+		sv.setAdapter(rc);
+		/*sv.setOnItemClickListener(new AdapterView.OnItemClickListener(){
+			@Override
+			public void onItemClick(AdapterView<?> p1, View p2, int p3, long p4){
+				res.selected(show.get(p3).routeId);
+				current.dismiss();
+			}
+		});*/
+
+
+		alertDialogBuilder.setView(mai);
+		if(true){
+			alertDialogBuilder.setNegativeButton(cancel_button,new DialogInterface.OnClickListener(){
+				public void onClick(DialogInterface dialog,int id){
+					dialog.cancel();
+				}
+			});
+		}
+
+		AlertDialog alertDialog = alertDialogBuilder.create();
+		alertDialog.show();
+		current=alertDialog;
+
+	}
+
+
+	public static abstract class Result{
+		public abstract void selected(String routeID,boolean addOrRemove);
+	}
+
 	public static class ChoseListener{
 		public AlertDialog dialog=alertDialog;
 		public void onChose(int choice){
@@ -306,6 +439,92 @@ public class CAlertDialog extends Activity
 
 		}
 
+	}
+
+
+	public class RouteCheck implements ListAdapter{
+		ArrayList<Engine.Route> arr;
+		Context ref;
+		Result inter;
+		public RouteCheck(Context c,ArrayList<Engine.Route> a,Result r){
+			arr=a;
+			ref=c;
+			inter=r;
+		}
+		@Override
+		public boolean areAllItemsEnabled() {
+			return false;
+		}
+
+		@Override
+		public boolean isEnabled(int position) {
+			return false;
+		}
+
+		@Override
+		public void registerDataSetObserver(DataSetObserver observer) {
+
+		}
+
+		@Override
+		public void unregisterDataSetObserver(DataSetObserver observer) {
+
+		}
+
+		@Override
+		public int getCount() {
+			return arr.size();
+		}
+
+		@Override
+		public Object getItem(int position) {
+			return null;
+		}
+
+		@Override
+		public long getItemId(int position) {
+			return 0;
+		}
+
+		@Override
+		public boolean hasStableIds() {
+			return false;
+		}
+
+		@Override
+		public View getView(int position, View convertView, ViewGroup parent) {
+			View vi=View.inflate(ref,R.layout.bus_check_item,null);
+			TextView tv=(TextView)vi.findViewById(R.id.item);
+			final Engine.Route r=arr.get(position);
+			tv.setText(r.busId+":"+r.routeName);
+			CheckBox cb=(CheckBox)vi.findViewById(R.id.checkmark);
+			cb.setChecked(hashMp.containsKey(r.routeId));
+			cb.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
+
+				@Override
+			   public void onCheckedChanged(CompoundButton buttonView,boolean isChecked) {
+					r.checked=isChecked;
+					inter.selected(r.routeId,r.checked);
+			   }
+		   }
+			);
+			return vi;
+		}
+
+		@Override
+		public int getItemViewType(int position) {
+			return 0;
+		}
+
+		@Override
+		public int getViewTypeCount() {
+			return arr.size();
+		}
+
+		@Override
+		public boolean isEmpty() {
+			return arr.isEmpty();
+		}
 	}
 
 	public class CListener implements OnClickListener,OnLongClickListener{

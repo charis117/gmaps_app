@@ -136,6 +136,7 @@ public class SQLEngine extends SQLiteOpenHelper {
 
 
 
+
     public ArrayList<Engine.Route> getRoutes(String stationSym){
         ArrayList<Station> dromologio = new ArrayList<Station>();
 
@@ -175,6 +176,74 @@ public class SQLEngine extends SQLiteOpenHelper {
         }
 
         return avaRoutes;
+    }
+
+    public Engine.Route getRouteFromID(String ID){
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor c2=db.rawQuery("select * from routes where _id="+ID,null);
+        c2.moveToFirst();
+        return new Engine.Route(
+                c2.getString(c2.getColumnIndex("title")),
+                c2.getString(c2.getColumnIndex("label")),
+                String.valueOf(ID),
+                String.valueOf(c2.getInt(c2.getColumnIndex("agency"))),
+                c2.getPosition());
+    }
+
+    public int getM1id(){
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor c2=db.rawQuery("select * from routes where name=\"m1\"",null);
+        c2.moveToFirst();
+        return
+                c2.getInt(c2.getColumnIndex("_id"));
+
+    }
+
+    public ArrayList<Engine.Route> getAllRoutes(){
+        ArrayList<Station> dromologio = new ArrayList<Station>();
+
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor res =  db.rawQuery( "select * from routes", null );
+        res.moveToFirst();
+        ArrayList<Engine.Route> avaRoutes=new ArrayList<Engine.Route>();
+        int cnt=1;
+        while(res.isAfterLast() == false){
+            avaRoutes.add(new Engine.Route(
+                    res.getString(res.getColumnIndex("title")),
+                    res.getString(res.getColumnIndex("label")),
+                    String.valueOf(res.getInt(res.getColumnIndex("_id"))),
+                    String.valueOf(res.getInt(res.getColumnIndex("agency"))),
+                    cnt
+            ));
+            cnt++;
+
+            res.moveToNext();
+        }
+
+        return avaRoutes;
+    }
+
+    public ArrayList<Station> getAllStations(){
+
+        SQLiteDatabase db = this.getReadableDatabase();
+        Cursor res =  db.rawQuery( "select * from markers", null );
+        res.moveToFirst();
+        ArrayList<Station> stats=new ArrayList<Station>();
+        int cnt=1;
+        while(res.isAfterLast() == false){
+            stats.add(new Station(
+                    res.getFloat(res.getColumnIndex("lat")),
+                    res.getFloat(res.getColumnIndex("lon")),
+                    res.getString(res.getColumnIndex("name")),
+                    res.getInt(res.getColumnIndex("_id")),
+                    res.getString(res.getColumnIndex("symbol"))
+            ));
+            cnt++;
+
+            res.moveToNext();
+        }
+
+        return stats;
     }
         static class Station{
         float lat;
