@@ -5,6 +5,7 @@ import android.content.pm.PackageManager;
 import android.content.res.AssetManager;
 import android.graphics.Color;
 import android.location.Location;
+import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.View;
@@ -113,7 +114,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     public void select(View v){
 
         ArrayList<Engine.Route> avaRoutes=mydb.getAllRoutes();
-         new CAlertDialog(MapsActivity.this, null, avaRoutes, "OK", true,visibleRoutes, new CAlertDialog.Result() {
+        new CAlertDialog(MapsActivity.this, null, avaRoutes, "OK", true,visibleRoutes, new CAlertDialog.Result() {
             @Override
             public void selected(String routeID,boolean addOrRemove) {
                 ////////Toast.makeText(getApplicationContext(),routeID,Toast.LENGTH_SHORT).show();
@@ -139,7 +140,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         Random r=new Random();
         int[] sels={Color.WHITE,Color.YELLOW,Color.GREEN,Color.MAGENTA};
         //int color=Color.rgb(r.nextInt(255),r.nextInt(255),r.nextInt(255));
-        return sels[r.nextInt(sels.length)];
+        return sels[r.nextInt(sels.length-1)];
     }
 
     public float pythDistance(double x1,double y1,double x2,double y2){
@@ -217,6 +218,8 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
         rd.polylineID=rd.polyline.getId();
         Toast.makeText(this,rd.polyline.getId(),Toast.LENGTH_SHORT);
         Log.v("MESSAGE","ADDED POLYLINE ID:"+rd.polyline.getId());
+        String passed=getIntent().getDataString();
+        Log.v("URI String:",passed);
         return rd;
     }
 
@@ -291,12 +294,82 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
         }
 
-        mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(38.1255073,23.7637454),18.0f));
+        Uri intent=getIntent().getData();
+
+        String passed = "none";
+        try {
+            Uri.decode(getIntent().getData().toString());
+        }catch(Exception e){
+
+
+
+
+        }
+
+
+
+
+        passed=passed.replaceAll(" ","");
+
+
+
+        if(passed.startsWith("geo")){
+
+            String dat=Uri.decode(intent.toString()).replaceAll(" ","");
+            Log.v("Uri loc",dat.substring(dat.indexOf(":")+1,dat.indexOf("?")));
+            String locTS=dat.substring(dat.indexOf(":")+1,dat.indexOf("?"));
+            String[] numsST= locTS.split(",");
+
+            float lat=Float.parseFloat(numsST[0]);
+            float lon=Float.parseFloat(numsST[1]);
+
+            if(lat+lon==0){
+
+                String q=intent.getQuery().replaceAll(" ","");
+                Log.v("URI q:",q);
+
+                String[] erte=q.split("=")[1].split(",");
+
+
+                float latTS=Float.parseFloat(erte[0]);
+                float lonTS=Float.parseFloat(erte[1]);
+                Log.v("LLON:",String.valueOf(latTS+lonTS));
+                LatLng posinten=new LatLng(latTS,lonTS);
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(posinten,18.0f));
+
+
+
+            }else{
+                LatLng posin=new LatLng(lat,lon);
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(posin,18.0f));
+
+            }
+
+
+        }else if(passed.startsWith("http")){
+            String linkURLts=passed;
+            String numPrtts=passed.substring(passed.indexOf("?ll")+4,passed.indexOf("&"));
+            String[] nums=numPrtts.split(",");
+            Log.v("FounDDD--",numPrtts);
+            float lan=Float.parseFloat(nums[0]);
+            float lat=Float.parseFloat(nums[1]);
+
+
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lan,lat),18.0f));
+
+
+        }else{
+
+            mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(38.1255073,23.7637454),18.0f));
+
+        }
+
+
         mMap.setOnMarkerClickListener(new GoogleMap.OnMarkerClickListener() {
             @Override
             public boolean onMarkerClick(Marker marker) {
                 //Toast.makeText(MapsActivity.this,marker.getTitle(), Toast.LENGTH_SHORT).show();
-              return false;
+                return false;
             }
         });
 
@@ -469,4 +542,6 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
                     PERMISSIONS_REQUEST_ACCESS_FINE_LOCATION);
         }
     }
+
+
 }
